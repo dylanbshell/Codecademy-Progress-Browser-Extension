@@ -16,7 +16,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function extractCodecademyProgress() {
   console.log('=== Starting Codecademy Progress Extraction ===');
 
-  // Extract all modules once and cache
+  // Try to get data from React/Apollo state first
+  const apolloData = extractFromApolloCache();
+  if (apolloData && apolloData.completedModules && apolloData.completedModules.length > 0) {
+    console.log('=== Using Apollo Cache Data ===');
+    return apolloData;
+  }
+
+  // Fallback to DOM extraction
   const allModules = extractAllModules();
 
   const data = {
@@ -30,6 +37,150 @@ function extractCodecademyProgress() {
 
   console.log('=== Extraction Complete ===', data);
   return data;
+}
+
+/**
+ * Try to extract progress data from Apollo/React state
+ * Codecademy uses Apollo GraphQL which caches data in the page
+ */
+function extractFromApolloCache() {
+  try {
+    // Look for React Fiber nodes that might contain progress data
+    const rootElement = document.querySelector('#app, [data-reactroot], #root');
+    if (!rootElement) return null;
+
+    // Try to access React Fiber
+    const fiberKey = Object.keys(rootElement).find(key =>
+      key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance')
+    );
+
+    if (!fiberKey) {
+      console.log('No React Fiber found');
+      return null;
+    }
+
+    console.log('Searching React state for progress data...');
+
+    // Search through React tree for progress data
+    const progressData = searchReactTree(rootElement[fiberKey]);
+
+    if (progressData) {
+      console.log('Found progress data in React state!', progressData);
+      return progressData;
+    }
+
+    console.log('No progress data found in React state');
+    return null;
+  } catch (error) {
+    console.log('Error extracting from Apollo cache:', error);
+    return null;
+  }
+}
+
+/**
+ * Recursively search React tree for progress data
+ */
+function searchReactTree(node, depth = 0, maxDepth = 15) {
+  if (!node || depth > maxDepth) return null;
+
+  try {
+    // Check if this node has memoizedProps or memoizedState with progress data
+    const props = node.memoizedProps || {};
+    const state = node.memoizedState || {};
+
+    // Look for arrays that might contain module/track data
+    const checkForProgressData = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+
+      // Look for track/module arrays
+      if (Array.isArray(obj)) {
+        // Check if this looks like a list of tracks/modules
+        if (obj.length > 10 && obj[0] && typeof obj[0] === 'object') {
+          const first = obj[0];
+          if (first.title || first.name || first.displayName) {
+            console.log(`Found potential progress array with ${obj.length} items`);
+            return extractProgressFromArray(obj);
+          }
+        }
+      }
+
+      // Recursively check object properties
+      for (const key in obj) {
+        if (key.includes('track') || key.includes('module') || key.includes('progress') || key.includes('syllabus')) {
+          const result = checkForProgressData(obj[key]);
+          if (result) return result;
+        }
+      }
+
+      return null;
+    };
+
+    const propsData = checkForProgressData(props);
+    if (propsData) return propsData;
+
+    const stateData = checkForProgressData(state);
+    if (stateData) return stateData;
+
+    // Search child and sibling nodes
+    const childResult = searchReactTree(node.child, depth + 1, maxDepth);
+    if (childResult) return childResult;
+
+    const siblingResult = searchReactTree(node.sibling, depth + 1, maxDepth);
+    if (siblingResult) return siblingResult;
+
+  } catch (error) {
+    // Silently continue on errors
+  }
+
+  return null;
+}
+
+/**
+ * Extract progress data from an array of tracks/modules
+ */
+function extractProgressFromArray(arr) {
+  const completed = [];
+  let currentModule = null;
+
+  for (const item of arr) {
+    const name = item.title || item.displayName || item.name;
+    if (!name) continue;
+
+    // Check various ways completion might be indicated
+    const isComplete =
+      item.completed === true ||
+      item.isCompleted === true ||
+      item.userCompleted === true ||
+      item.progress === 100 ||
+      item.percentComplete === 100 ||
+      item.status === 'completed' ||
+      item.state === 'completed';
+
+    if (isComplete && !name.toLowerCase().includes('welcome to')) {
+      completed.push(name);
+    }
+
+    // Find current module (first incomplete one)
+    if (!currentModule && !isComplete && !name.toLowerCase().includes('welcome to')) {
+      currentModule = {
+        name: name,
+        progress: item.progress || item.percentComplete || null
+      };
+    }
+  }
+
+  if (completed.length > 0 || currentModule) {
+    return {
+      careerPath: 'Full-Stack Engineer',
+      overallProgress: null,
+      currentModule: currentModule,
+      completedModules: completed,
+      recentLessons: [],
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  return null;
 }
 
 /**
