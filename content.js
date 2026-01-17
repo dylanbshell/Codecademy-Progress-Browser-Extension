@@ -151,11 +151,55 @@ function extractAllModules() {
       if (moduleNameEl) {
         const name = moduleNameEl.textContent.trim();
 
-        // Check if this module has a completed icon
-        const hasCompletedIcon = item.querySelector('[data-testid="completed-icon"]');
-        const isCompleted = hasCompletedIcon !== null;
+        // Multiple strategies to detect completion:
+        // 1. Check for completed icon (most reliable)
+        let hasCompletedIcon = item.querySelector('[data-testid="completed-icon"]');
 
-        console.log(`Module ${index}: "${name}" - Completed: ${isCompleted}`);
+        // 2. Check for SVG with specific viewBox that indicates checkmark
+        if (!hasCompletedIcon) {
+          const svgs = item.querySelectorAll('svg');
+          if (index < 3) { // Log first 3 modules for debugging
+            console.log(`  Module ${index} has ${svgs.length} SVGs`);
+          }
+          for (const svg of svgs) {
+            // Log SVG attributes for debugging
+            if (index < 3) {
+              const viewBox = svg.getAttribute('viewBox');
+              const fill = svg.getAttribute('fill');
+              console.log(`    SVG: viewBox=${viewBox}, fill=${fill}`);
+            }
+
+            // Completed icons often have specific SVG structure
+            const path = svg.querySelector('path');
+            const circle = svg.querySelector('circle');
+            // If it has a circle and path (checkmark pattern), it's likely a completed icon
+            if (circle && path) {
+              hasCompletedIcon = svg;
+              if (index < 3) console.log(`    -> Found circle+path pattern (completed icon)`);
+              break;
+            }
+          }
+        }
+
+        // 3. Check for green color indicators (checkmarks are usually green)
+        if (!hasCompletedIcon) {
+          const coloredElements = item.querySelectorAll('[fill="#10DC60"], [fill="#00D68F"], [fill="green"], [fill="#10B981"]');
+          if (coloredElements.length > 0) {
+            hasCompletedIcon = coloredElements[0];
+          }
+        }
+
+        // 4. Check button element for specific classes that might indicate completion
+        const button = item.querySelector('button');
+        let isCompleted = hasCompletedIcon !== null;
+
+        if (!isCompleted && button) {
+          const buttonClass = button.className || '';
+          // Some platforms use class names to indicate state
+          isCompleted = buttonClass.includes('complete') || buttonClass.includes('done');
+        }
+
+        console.log(`Module ${index}: "${name}" - Completed: ${isCompleted}` + (hasCompletedIcon ? ` (icon found)` : ''));
 
         // Try to find progress percentage
         const percentageMatch = item.textContent.match(/(\d+)%/);
