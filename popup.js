@@ -1,0 +1,230 @@
+// Popup script - handles UI, data formatting, and clipboard operations
+
+// DOM elements
+const loadingEl = document.getElementById('loading');
+const errorEl = document.getElementById('error');
+const contentEl = document.getElementById('content');
+const careerPathEl = document.getElementById('careerPath');
+const overallProgressEl = document.getElementById('overallProgress');
+const currentModuleSection = document.getElementById('currentModuleSection');
+const currentModuleNameEl = document.getElementById('currentModuleName');
+const currentModuleProgressEl = document.getElementById('currentModuleProgress');
+const recentLessonsSection = document.getElementById('recentLessonsSection');
+const recentLessonsEl = document.getElementById('recentLessons');
+const completedModulesSection = document.getElementById('completedModulesSection');
+const completedModulesEl = document.getElementById('completedModules');
+const copyBtn = document.getElementById('copyBtn');
+const successMsg = document.getElementById('successMsg');
+
+// Store progress data globally
+let progressData = null;
+
+// Initialize popup when opened
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadProgressData();
+});
+
+/**
+ * Load progress data from current tab
+ */
+async function loadProgressData() {
+  try {
+    // Get current active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    // Check if we're on Codecademy
+    if (!tab.url.includes('codecademy.com')) {
+      showError();
+      return;
+    }
+
+    // Request data from content script
+    chrome.tabs.sendMessage(
+      tab.id,
+      { action: 'extractProgress' },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          // Content script might not be loaded yet, try cached data
+          loadCachedData();
+          return;
+        }
+
+        if (response && response.success) {
+          progressData = response.data;
+          displayProgress(progressData);
+        } else {
+          // Fallback to cached data
+          loadCachedData();
+        }
+      }
+    );
+  } catch (error) {
+    console.error('Error loading progress:', error);
+    loadCachedData();
+  }
+}
+
+/**
+ * Load cached data from chrome.storage
+ */
+async function loadCachedData() {
+  const result = await chrome.storage.local.get(['cachedProgress']);
+  if (result.cachedProgress) {
+    progressData = result.cachedProgress;
+    displayProgress(progressData);
+  } else {
+    showError();
+  }
+}
+
+/**
+ * Display progress data in the popup
+ */
+function displayProgress(data) {
+  // Hide loading, show content
+  loadingEl.classList.add('hidden');
+  contentEl.classList.remove('hidden');
+
+  // Career path name
+  careerPathEl.textContent = data.careerPath || 'Codecademy Career Path';
+
+  // Overall progress
+  if (data.overallProgress !== null) {
+    overallProgressEl.textContent = `${data.overallProgress}%`;
+    overallProgressEl.style.display = 'block';
+  } else {
+    overallProgressEl.style.display = 'none';
+  }
+
+  // Current module
+  if (data.currentModule && data.currentModule.name) {
+    currentModuleNameEl.textContent = data.currentModule.name;
+    if (data.currentModule.progress !== null) {
+      currentModuleProgressEl.textContent = `${data.currentModule.progress}%`;
+      currentModuleProgressEl.style.display = 'inline-block';
+    } else {
+      currentModuleProgressEl.style.display = 'none';
+    }
+    currentModuleSection.style.display = 'block';
+  } else {
+    currentModuleSection.style.display = 'none';
+  }
+
+  // Recent lessons
+  if (data.recentLessons && data.recentLessons.length > 0) {
+    recentLessonsEl.innerHTML = '';
+    data.recentLessons.forEach(lesson => {
+      const li = document.createElement('li');
+      li.textContent = lesson;
+      recentLessonsEl.appendChild(li);
+    });
+    recentLessonsSection.style.display = 'block';
+  } else {
+    recentLessonsSection.style.display = 'none';
+  }
+
+  // Completed modules
+  if (data.completedModules && data.completedModules.length > 0) {
+    completedModulesEl.innerHTML = '';
+    data.completedModules.forEach(module => {
+      const chip = document.createElement('span');
+      chip.className = 'module-chip';
+      chip.textContent = module;
+      completedModulesEl.appendChild(chip);
+    });
+    completedModulesSection.style.display = 'block';
+  } else {
+    completedModulesSection.style.display = 'none';
+  }
+}
+
+/**
+ * Show error state
+ */
+function showError() {
+  loadingEl.classList.add('hidden');
+  errorEl.classList.remove('hidden');
+  contentEl.classList.add('hidden');
+}
+
+/**
+ * Format progress data for AI chat
+ */
+function formatForAI(data) {
+  let text = `I just finished studying on Codecademy`;
+
+  // Add career path name
+  if (data.careerPath) {
+    text += ` - ${data.careerPath}`;
+  }
+  text += '.\n\n';
+
+  // Add current module
+  if (data.currentModule && data.currentModule.name) {
+    text += `Currently working on: ${data.currentModule.name}`;
+    if (data.currentModule.progress !== null) {
+      text += ` (${data.currentModule.progress}% complete)`;
+    }
+    text += '\n\n';
+  }
+
+  // Add recent lessons
+  if (data.recentLessons && data.recentLessons.length > 0) {
+    text += 'Recently completed lessons:\n';
+    data.recentLessons.forEach(lesson => {
+      text += `• ${lesson}\n`;
+    });
+    text += '\n';
+  }
+
+  // Add completed modules
+  if (data.completedModules && data.completedModules.length > 0) {
+    text += 'Previously completed modules:\n';
+    // Show first 10 modules
+    const modulesToShow = data.completedModules.slice(0, 10);
+    modulesToShow.forEach(module => {
+      text += `• ${module}\n`;
+    });
+
+    if (data.completedModules.length > 10) {
+      text += `[... and ${data.completedModules.length - 10} more]\n`;
+    }
+    text += '\n';
+  }
+
+  // Add AI instruction
+  text += 'Please quiz me with 5-7 quick recall questions focused on my recently completed lessons. ';
+  text += 'After each answer, provide a brief explanation. Ready when you say "start".';
+
+  return text;
+}
+
+/**
+ * Copy formatted text to clipboard
+ */
+async function copyToClipboard() {
+  if (!progressData) {
+    return;
+  }
+
+  try {
+    const formattedText = formatForAI(progressData);
+    await navigator.clipboard.writeText(formattedText);
+
+    // Show success message
+    successMsg.classList.remove('hidden');
+    copyBtn.classList.add('success');
+
+    // Hide after 2 seconds
+    setTimeout(() => {
+      successMsg.classList.add('hidden');
+      copyBtn.classList.remove('success');
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to copy:', error);
+    alert('Failed to copy to clipboard. Please try again.');
+  }
+}
+
+// Event listeners
+copyBtn.addEventListener('click', copyToClipboard);

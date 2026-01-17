@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codecademy Progress Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>Codecademy Progress</h1>
+      <p class="subtitle">Ready for AI quizzing</p>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Extracting your progress...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="error hidden">
+      <p class="error-icon">⚠️</p>
+      <p class="error-message">Please navigate to a Codecademy career path page</p>
+      <a href="https://www.codecademy.com/learn" target="_blank" class="link">Go to Codecademy</a>
+    </div>
+
+    <!-- Main Content -->
+    <div id="content" class="content hidden">
+      <!-- Career Path Info -->
+      <section class="section">
+        <h2 id="careerPath" class="career-path">Loading...</h2>
+        <div id="overallProgress" class="progress-badge">0%</div>
+      </section>
+
+      <!-- Current Module -->
+      <section class="section" id="currentModuleSection">
+        <h3 class="section-title">Currently Working On</h3>
+        <div class="module-card current">
+          <p id="currentModuleName" class="module-name">-</p>
+          <div id="currentModuleProgress" class="progress-badge small">0%</div>
+        </div>
+      </section>
+
+      <!-- Recent Lessons -->
+      <section class="section" id="recentLessonsSection">
+        <h3 class="section-title">Recently Completed</h3>
+        <ul id="recentLessons" class="lesson-list">
+          <!-- Populated by JavaScript -->
+        </ul>
+      </section>
+
+      <!-- Completed Modules -->
+      <section class="section" id="completedModulesSection">
+        <h3 class="section-title">Completed Modules</h3>
+        <div id="completedModules" class="modules-grid">
+          <!-- Populated by JavaScript -->
+        </div>
+      </section>
+
+      <!-- Action Button -->
+      <button id="copyBtn" class="copy-btn">
+        <span class="btn-icon">📋</span>
+        Copy for AI Chat
+      </button>
+
+      <!-- Success Message -->
+      <div id="successMsg" class="success-msg hidden">
+        ✓ Copied to clipboard!
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="footer-text">Paste into ChatGPT, Claude, or Gemini</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

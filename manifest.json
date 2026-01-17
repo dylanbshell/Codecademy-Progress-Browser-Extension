@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Codecademy Progress Tracker",
+  "version": "1.0.0",
+  "description": "Extract your Codecademy progress and format it for AI-powered study sessions",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "assets/icon.png",
+      "48": "assets/icon.png",
+      "128": "assets/icon.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icon.png",
+    "48": "assets/icon.png",
+    "128": "assets/icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.codecademy.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
