@@ -31,13 +31,13 @@ function extractCodecademyProgress() {
  * Looks for main heading (h1) on the page
  */
 function extractCareerPath() {
-  // Try multiple selectors for resilience
+  // Try to find the h1 in the syllabus browser or main page
   const selectors = [
-    'h1[class*="title"]',
-    'h1[class*="heading"]',
+    '[data-testid="syllabus-browser-content"] h1',
+    'h1[class*="StyledText"]',
     'h1',
-    '[data-testid="career-path-title"]',
-    '[class*="career-path"] h1'
+    '[class*="career-path"] h1',
+    'h1[class*="title"]'
   ];
 
   for (const selector of selectors) {
@@ -85,39 +85,55 @@ function extractOverallProgress() {
  * Looks for modules marked as in-progress
  */
 function extractCurrentModule() {
-  // Look for elements indicating current/in-progress status
-  const selectors = [
-    '[class*="in-progress"]',
-    '[class*="current"]',
-    '[data-testid*="current"]',
-    '[class*="active"]'
-  ];
+  // Look for the tracks accordion list in the syllabus browser
+  const tracksList = document.querySelector('[data-testid="tracks-accordions-list"]');
 
-  for (const selector of selectors) {
-    const element = document.querySelector(selector);
-    if (element) {
-      // Try to find module name and progress within or near this element
-      const moduleNameEl = element.querySelector('h2, h3, [class*="title"]') || element;
-      const moduleName = moduleNameEl.textContent.trim();
+  if (tracksList) {
+    // Find all list items (modules)
+    const moduleItems = tracksList.querySelectorAll('li');
 
-      // Look for progress percentage
-      const percentageMatch = element.textContent.match(/(\d+)%/);
-      const progress = percentageMatch ? parseInt(percentageMatch[1]) : null;
+    // Find the first module without a completed icon (in progress)
+    for (const item of moduleItems) {
+      const completedIcon = item.querySelector('[data-testid="completed-icon"]');
 
-      if (moduleName) {
-        return {
-          name: moduleName,
-          progress: progress
-        };
+      if (!completedIcon) {
+        // This module is in progress
+        const moduleNameEl = item.querySelector('h2[class*="StyledText"]');
+        if (moduleNameEl) {
+          const moduleName = moduleNameEl.textContent.trim();
+
+          // Try to find progress percentage
+          const percentageMatch = item.textContent.match(/(\d+)%/);
+          const progress = percentageMatch ? parseInt(percentageMatch[1]) : null;
+
+          if (moduleName) {
+            return {
+              name: moduleName,
+              progress: progress
+            };
+          }
+        }
       }
     }
   }
 
-  // Fallback: look for the first module that's not 100% complete
-  const allModules = extractAllModules();
-  for (const module of allModules) {
-    if (module.progress !== null && module.progress < 100 && module.progress > 0) {
-      return module;
+  // Fallback: look for elements with "current" or "active" indicators
+  const currentSelectors = [
+    '[class*="current"] h2',
+    '[class*="active"] h2',
+    'button[class*="active"] h2'
+  ];
+
+  for (const selector of currentSelectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      const moduleName = element.textContent.trim();
+      if (moduleName) {
+        return {
+          name: moduleName,
+          progress: null
+        };
+      }
     }
   }
 
@@ -131,23 +147,50 @@ function extractCurrentModule() {
 function extractAllModules() {
   const modules = [];
 
-  // Look for module containers
-  const moduleElements = document.querySelectorAll('[class*="module"], [class*="section"], [data-testid*="module"]');
+  // Look for the tracks accordion list in the syllabus browser
+  const tracksList = document.querySelector('[data-testid="tracks-accordions-list"]');
 
-  moduleElements.forEach(element => {
-    const titleEl = element.querySelector('h2, h3, [class*="title"]');
-    const title = titleEl?.textContent.trim();
+  if (tracksList) {
+    // Find all list items (modules)
+    const moduleItems = tracksList.querySelectorAll('li');
 
-    if (title) {
-      const percentageMatch = element.textContent.match(/(\d+)%/);
-      const progress = percentageMatch ? parseInt(percentageMatch[1]) : null;
+    moduleItems.forEach(item => {
+      // Find the module name (h2 tag)
+      const moduleNameEl = item.querySelector('h2[class*="StyledText"]');
+      if (moduleNameEl) {
+        const name = moduleNameEl.textContent.trim();
 
-      modules.push({
-        name: title,
-        progress: progress
-      });
-    }
-  });
+        // Check if completed
+        const hasCompletedIcon = item.querySelector('[data-testid="completed-icon"]');
+        const progress = hasCompletedIcon ? 100 : null;
+
+        // Try to find actual progress percentage if available
+        const percentageMatch = item.textContent.match(/(\d+)%/);
+        const actualProgress = percentageMatch ? parseInt(percentageMatch[1]) : progress;
+
+        if (name) {
+          modules.push({
+            name: name,
+            progress: actualProgress
+          });
+        }
+      }
+    });
+  }
+
+  // Fallback: look for all h2 elements on the page
+  if (modules.length === 0) {
+    const allH2s = document.querySelectorAll('h2[class*="StyledText"]');
+    allH2s.forEach(h2 => {
+      const name = h2.textContent.trim();
+      if (name && name.length > 3) {
+        modules.push({
+          name: name,
+          progress: null
+        });
+      }
+    });
+  }
 
   return modules;
 }
@@ -158,34 +201,45 @@ function extractAllModules() {
  */
 function extractCompletedModules() {
   const completed = [];
-  const allModules = extractAllModules();
 
-  // Filter for 100% complete modules
-  for (const module of allModules) {
-    if (module.progress === 100) {
-      completed.push(module.name);
-    }
-  }
+  // Look for the tracks accordion list in the syllabus browser
+  const tracksList = document.querySelector('[data-testid="tracks-accordions-list"]');
 
-  // Also look for elements specifically marked as complete
-  const completeSelectors = [
-    '[class*="complete"] h2',
-    '[class*="complete"] h3',
-    '[class*="completed"] h2',
-    '[class*="completed"] h3',
-    '[data-testid*="complete"] h2',
-    '[data-testid*="complete"] h3'
-  ];
+  if (tracksList) {
+    // Find all list items (modules)
+    const moduleItems = tracksList.querySelectorAll('li');
 
-  completeSelectors.forEach(selector => {
-    const elements = document.querySelectorAll(selector);
-    elements.forEach(el => {
-      const name = el.textContent.trim();
-      if (name && !completed.includes(name)) {
-        completed.push(name);
+    moduleItems.forEach(item => {
+      // Check if this module has a completed icon
+      const completedIcon = item.querySelector('[data-testid="completed-icon"]');
+
+      if (completedIcon) {
+        // Find the module name (h2 tag)
+        const moduleNameEl = item.querySelector('h2[class*="StyledText"]');
+        if (moduleNameEl) {
+          const name = moduleNameEl.textContent.trim();
+          if (name && !completed.includes(name)) {
+            completed.push(name);
+          }
+        }
       }
     });
-  });
+  }
+
+  // Fallback: look for h2 elements with completed icons nearby
+  if (completed.length === 0) {
+    const allH2s = document.querySelectorAll('h2[class*="StyledText"]');
+    allH2s.forEach(h2 => {
+      // Check if there's a completed icon in the same parent or ancestor
+      const parent = h2.closest('li, button, div[class*="module"]');
+      if (parent && parent.querySelector('[data-testid="completed-icon"]')) {
+        const name = h2.textContent.trim();
+        if (name && !completed.includes(name)) {
+          completed.push(name);
+        }
+      }
+    });
+  }
 
   return completed;
 }
@@ -196,43 +250,71 @@ function extractCompletedModules() {
  */
 function extractRecentLessons() {
   const lessons = [];
-
-  // Look for lesson lists or items
-  const lessonSelectors = [
-    '[class*="lesson"]',
-    '[data-testid*="lesson"]',
-    '[class*="item"]',
-    'li'
-  ];
-
   const seenLessons = new Set();
 
-  lessonSelectors.forEach(selector => {
-    const elements = document.querySelectorAll(selector);
-    elements.forEach(element => {
-      // Check if it's marked as complete or recent
-      const isComplete = element.className.includes('complete') ||
-                        element.className.includes('finished') ||
-                        element.querySelector('[class*="complete"]') ||
-                        element.querySelector('[class*="check"]');
+  // Strategy 1: Look inside expanded modules in the syllabus browser
+  const tracksList = document.querySelector('[data-testid="tracks-accordions-list"]');
+  if (tracksList) {
+    // Look for expanded accordion items
+    const expandedModules = tracksList.querySelectorAll('[aria-expanded="true"]');
 
-      if (isComplete) {
-        // Get lesson name
-        const nameEl = element.querySelector('h4, h5, span, a') || element;
-        const name = nameEl.textContent.trim();
+    expandedModules.forEach(module => {
+      // Find lesson items within expanded modules
+      const lessonItems = module.querySelectorAll('li, [class*="lesson"]');
+      lessonItems.forEach(item => {
+        const hasCompletedIcon = item.querySelector('[data-testid="completed-icon"]');
+        if (hasCompletedIcon) {
+          // Look for lesson name in h3, h4, or span
+          const lessonNameEl = item.querySelector('h3, h4, span[class*="text"], a');
+          if (lessonNameEl) {
+            const name = lessonNameEl.textContent.trim();
+            if (name && !seenLessons.has(name) && name.length > 3 && name.length < 150) {
+              lessons.push(name);
+              seenLessons.add(name);
+            }
+          }
+        }
+      });
+    });
+  }
 
-        // Avoid duplicates and invalid names
-        if (name &&
-            !seenLessons.has(name) &&
-            name.length > 3 &&
-            name.length < 150 &&
-            !name.match(/^\d+%$/)) { // Avoid percentage-only text
-          lessons.push(name);
-          seenLessons.add(name);
+  // Strategy 2: Look on the main content area for lesson info
+  const mainContent = document.querySelector('main, [role="main"], #main-content');
+  if (mainContent && lessons.length < 5) {
+    // Look for completed checkmarks or progress indicators
+    const completedElements = mainContent.querySelectorAll('[data-testid="completed-icon"]');
+    completedElements.forEach(icon => {
+      const container = icon.closest('li, div[class*="item"], button');
+      if (container) {
+        const nameEl = container.querySelector('h3, h4, h5, span, a');
+        if (nameEl) {
+          const name = nameEl.textContent.trim();
+          if (name && !seenLessons.has(name) && name.length > 3 && name.length < 150) {
+            lessons.push(name);
+            seenLessons.add(name);
+          }
         }
       }
     });
-  });
+  }
+
+  // Strategy 3: Get lesson titles from h3/h4 tags with completed indicators nearby
+  if (lessons.length < 3) {
+    const headings = document.querySelectorAll('h3, h4');
+    headings.forEach(heading => {
+      const parent = heading.closest('li, div, section');
+      if (parent) {
+        const hasCheck = parent.querySelector('[data-testid="completed-icon"], [class*="complete"], [class*="check"]');
+        if (hasCheck) {
+          const name = heading.textContent.trim();
+          if (name && !seenLessons.has(name) && name.length > 3 && name.length < 150 && !name.match(/^\d+%$/)) {
+            lessons.push(name);
+            seenLessons.add(name);
+          }
+        }
+      }
+    });
+  }
 
   // Limit to most recent 10 lessons
   return lessons.slice(0, 10);
