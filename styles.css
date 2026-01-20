@@ -1,4 +1,5 @@
 /* Codecademy Progress Tracker - Styles */
+/* Color scheme matches Codecademy branding */
 
 * {
   margin: 0;
@@ -10,7 +11,7 @@ body {
   width: 380px;
   min-height: 400px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #10162F;
   color: #333;
 }
 
@@ -23,7 +24,7 @@ body {
 
 /* Header */
 header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #10162F;
   color: white;
   padding: 20px;
   text-align: center;
@@ -38,6 +39,7 @@ header h1 {
 .subtitle {
   font-size: 12px;
   opacity: 0.9;
+  color: #FFC900;
 }
 
 /* Loading State */
@@ -54,7 +56,7 @@ header h1 {
   width: 40px;
   height: 40px;
   border: 4px solid #f3f4f6;
-  border-top-color: #667eea;
+  border-top-color: #FFC900;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 16px;
@@ -92,18 +94,18 @@ header h1 {
 }
 
 .link {
-  color: #667eea;
+  color: #10162F;
   text-decoration: none;
   font-weight: 500;
   font-size: 14px;
   padding: 8px 16px;
-  border: 2px solid #667eea;
+  border: 2px solid #10162F;
   border-radius: 6px;
   transition: all 0.2s;
 }
 
 .link:hover {
-  background: #667eea;
+  background: #10162F;
   color: white;
 }
 
@@ -139,8 +141,8 @@ header h1 {
 
 .progress-badge {
   display: inline-block;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #FFC900;
+  color: #10162F;
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 14px;
@@ -165,8 +167,8 @@ header h1 {
 }
 
 .module-card.current {
-  border-color: #667eea;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border-color: #FFC900;
+  background: rgba(255, 201, 0, 0.05);
 }
 
 .module-name {
@@ -185,7 +187,7 @@ header h1 {
 .lesson-list li {
   padding: 10px 12px;
   background: #f9fafb;
-  border-left: 3px solid #667eea;
+  border-left: 3px solid #FFC900;
   margin-bottom: 8px;
   border-radius: 4px;
   font-size: 13px;
@@ -208,8 +210,8 @@ header h1 {
 }
 
 .module-chip {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: #10162F;
+  color: white;
   padding: 6px 12px;
   border-radius: 16px;
   font-size: 12px;
@@ -223,8 +225,8 @@ header h1 {
   width: calc(100% - 40px);
   margin: 0 20px 20px;
   padding: 14px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #FFC900;
+  color: #10162F;
   border: none;
   border-radius: 8px;
   font-size: 15px;
@@ -239,7 +241,8 @@ header h1 {
 
 .copy-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 201, 0, 0.4);
+  background: #FFD43B;
 }
 
 .copy-btn:active {
@@ -247,7 +250,8 @@ header h1 {
 }
 
 .copy-btn.success {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: #10b981;
+  color: white;
 }
 
 .btn-icon {
@@ -271,7 +275,7 @@ header h1 {
 
 /* Footer */
 .footer {
-  background: #f9fafb;
+  background: #10162F;
   padding: 12px 20px;
   text-align: center;
   border-top: 1px solid #e5e7eb;
@@ -279,7 +283,7 @@ header h1 {
 
 .footer-text {
   font-size: 11px;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* Utility Classes */

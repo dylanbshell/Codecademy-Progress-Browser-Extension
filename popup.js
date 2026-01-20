@@ -180,20 +180,15 @@ function formatForAI(data) {
   // Add completed modules
   if (data.completedModules && data.completedModules.length > 0) {
     text += 'Previously completed modules:\n';
-    // Show first 10 modules
-    const modulesToShow = data.completedModules.slice(0, 10);
-    modulesToShow.forEach(module => {
+    data.completedModules.forEach(module => {
       text += `• ${module}\n`;
     });
-
-    if (data.completedModules.length > 10) {
-      text += `[... and ${data.completedModules.length - 10} more]\n`;
-    }
     text += '\n';
   }
 
   // Add AI instruction
-  text += 'Please quiz me with 5-7 quick recall questions focused on my recently completed lessons. ';
+  text += 'Please quiz me with 5-7 quick recall questions focused on my most recently completed lesson. ';
+  text += 'After that, quiz me with 5-7 quick recall questions about any of the lessons I\'ve completed so far. ';
   text += 'After each answer, provide a brief explanation. Ready when you say "start".';
 
   return text;
