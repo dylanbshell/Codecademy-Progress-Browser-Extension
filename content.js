@@ -7,11 +7,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Try to open the syllabus sidebar first
     openSyllabusSidebar();
 
-    // Give it a moment to open, then extract data
+    // Wait for sidebar to fully open and navigate (300ms + 300ms + buffer for DOM updates)
     setTimeout(() => {
       const progressData = extractCodecademyProgress();
       sendResponse({ success: true, data: progressData });
-    }, 500);
+    }, 1500);
 
     return true; // Keep message channel open for async response
   }
@@ -317,15 +317,10 @@ function extractRecentLessons() {
 }
 
 // Auto-extract on page load and cache in chrome.storage
+// Only extracts data if sidebar is already open, doesn't force it open
 window.addEventListener('load', () => {
   setTimeout(() => {
-    // Try to open sidebar first
-    openSyllabusSidebar();
-
-    // Wait a bit for sidebar to open, then extract
-    setTimeout(() => {
-      const data = extractCodecademyProgress();
-      chrome.storage.local.set({ cachedProgress: data });
-    }, 500);
+    const data = extractCodecademyProgress();
+    chrome.storage.local.set({ cachedProgress: data });
   }, 2000);
 });
