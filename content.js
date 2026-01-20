@@ -151,10 +151,18 @@ function extractAllModules() {
 
 /**
  * Check if a module is completed by looking for the CheckFilledIcon SVG
+ * Only checks the module header, ignoring child lesson elements
  */
 function checkModuleCompleted(moduleElement) {
+  // Get only the module header (h2 and its siblings), not nested child lessons
+  const moduleHeader = moduleElement.querySelector('h2')?.parentElement;
+  if (!moduleHeader) {
+    return false;
+  }
+
   // Primary method: Look for CheckFilledIcon in SVG mask (Codecademy's completed checkmark)
-  const svgs = moduleElement.querySelectorAll('svg');
+  // Only search within the header element to ignore child lessons
+  const svgs = moduleHeader.querySelectorAll('svg');
   for (const svg of svgs) {
     // Check mask IDs
     const masks = svg.querySelectorAll('mask');
@@ -169,13 +177,13 @@ function checkModuleCompleted(moduleElement) {
     }
   }
 
-  // Secondary: Check for completed-icon data-testid
-  if (moduleElement.querySelector('[data-testid="completed-icon"]')) {
+  // Secondary: Check for completed-icon data-testid in header only
+  if (moduleHeader.querySelector('[data-testid="completed-icon"]')) {
     return true;
   }
 
-  // Tertiary: Check for "100%" text
-  if (moduleElement.textContent?.includes('100%')) {
+  // Tertiary: Check for "100%" text in header only
+  if (moduleHeader.textContent?.includes('100%')) {
     return true;
   }
 
