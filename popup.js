@@ -223,21 +223,49 @@ async function copyToClipboard() {
 }
 
 /**
+ * Parse career path base URL from any Codecademy URL
+ */
+function parseCareerPathUrl(url) {
+  // Match pattern: /journeys/{name}/paths/{name}
+  const journeyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+\/paths\/[^\/]+)/);
+  if (journeyMatch) {
+    return journeyMatch[1];
+  }
+
+  // Match pattern: /journeys/{name}
+  const journeyOnlyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+)/);
+  if (journeyOnlyMatch) {
+    return journeyOnlyMatch[1];
+  }
+
+  return null;
+}
+
+/**
  * Navigate to career path page for progress extraction
  */
 async function navigateToCareerPath() {
   try {
-    // Try to get cached data to find the career path URL
-    const result = await chrome.storage.local.get(['cachedProgress']);
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     let targetUrl = 'https://www.codecademy.com/learn';
 
-    // If we have cached data with a URL, use that
-    if (result.cachedProgress?.pageUrl) {
-      targetUrl = result.cachedProgress.pageUrl;
+    // Try to parse the current tab's URL first
+    if (tab.url && tab.url.includes('codecademy.com')) {
+      const parsed = parseCareerPathUrl(tab.url);
+      if (parsed) {
+        targetUrl = parsed;
+      }
     }
 
-    // Get current tab and navigate it
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    // If no parsed URL, try cached data
+    if (targetUrl === 'https://www.codecademy.com/learn') {
+      const result = await chrome.storage.local.get(['cachedProgress']);
+      if (result.cachedProgress?.pageUrl) {
+        targetUrl = result.cachedProgress.pageUrl;
+      }
+    }
+
+    // Navigate to the target URL
     await chrome.tabs.update(tab.id, { url: targetUrl });
 
     // Close the popup (it will reopen automatically after navigation)

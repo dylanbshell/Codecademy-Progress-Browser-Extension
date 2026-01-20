@@ -91,6 +91,29 @@ function openSyllabusSidebar() {
 }
 
 /**
+ * Extract the base career path URL from the current page URL
+ * Returns a clean URL that points to the syllabus overview
+ */
+function extractCareerPathUrl() {
+  const url = window.location.href;
+
+  // Match pattern: /journeys/{name}/paths/{name}
+  const journeyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+\/paths\/[^\/]+)/);
+  if (journeyMatch) {
+    return journeyMatch[1];
+  }
+
+  // Match pattern: /journeys/{name} (fallback to journey level)
+  const journeyOnlyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+)/);
+  if (journeyOnlyMatch) {
+    return journeyOnlyMatch[1];
+  }
+
+  // If we can't parse it, return the current URL (it might already be the right page)
+  return url;
+}
+
+/**
  * Main extraction function - gathers all progress data from the page
  */
 function extractCodecademyProgress() {
@@ -102,7 +125,7 @@ function extractCodecademyProgress() {
     currentModule: extractCurrentModuleFromList(allModules),
     completedModules: extractCompletedModulesFromList(allModules),
     recentLessons: extractRecentLessons(),
-    pageUrl: window.location.href,
+    pageUrl: extractCareerPathUrl(),
     timestamp: new Date().toISOString()
   };
 }
