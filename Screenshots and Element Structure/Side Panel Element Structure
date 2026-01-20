@@ -1,0 +1,153 @@
+<!-- CODECADEMY SYLLABUS STRUCTURE REFERENCE -->
+<!-- Condensed for token efficiency - shows patterns, not full repetition -->
+
+<div class="ey2ori50 gamut-1viswen-Box-DrawerBase ebnwbv90" style="width: 30rem;">
+  
+  <!-- HEADER SECTION -->
+  <div class="gamut-tmw4wz-Box ebnwbv90">
+    <h1 class="gamut-zz6qte-StyledText e8i0p5k0">
+      <div>Full-Stack Engineer</div> <!-- Course Name -->
+    </h1>
+    <button aria-label="Close"><!-- Close button --></button>
+  </div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <div data-testid="syllabus-browser-content">
+    <section aria-label="Syllabus Browser">
+      
+      <!-- MODULES LIST -->
+      <ul data-testid="tracks-accordions-list">
+        
+        <!-- COMPLETED MODULE (has checkmark icon) -->
+        <li>
+          <button aria-expanded="false">
+            <div>
+              <!-- Status Icon: CheckFilledIcon = completed -->
+              <svg viewBox="0 0 24 24"><!-- Checkmark SVG --></svg>
+              
+              <h2>Welcome to the Full-Stack Engineer Path</h2>
+              
+              <!-- Chevron for accordion -->
+              <svg><!-- Down arrow --></svg>
+            </div>
+          </button>
+          <div style="height: 0px;"><!-- Collapsed content --></div>
+        </li>
+
+        <!-- ANOTHER COMPLETED MODULE (pattern repeats) -->
+        <li>
+          <button aria-expanded="false">
+            <svg><!-- Checkmark --></svg>
+            <h2>Fundamentals of HTML</h2>
+          </button>
+          <div style="height: 0px;"></div>
+        </li>
+
+        <!-- IN-PROGRESS MODULE (has progress circle instead of checkmark) -->
+        <li>
+          <button aria-expanded="true"> <!-- Note: expanded=true -->
+            <div>
+              <!-- Status Icon: RadialProgressWrapper = in progress -->
+              <figure class="el6aqu80 gamut-hgc6w6-RadialProgressWrapper">
+                <figcaption>60% progress</figcaption>
+                <svg><!-- Progress circle SVG --></svg>
+              </figure>
+              
+              <h2>Database Basics</h2>
+              <svg style="transform: rotate(180deg);"><!-- Chevron up --></svg>
+            </div>
+          </button>
+          
+          <!-- EXPANDED ACCORDION - Shows lessons inside -->
+          <div style="height: auto;">
+            <ul>
+              
+              <!-- COMPLETED LESSON -->
+              <button type="button">
+                <div>
+                  <svg data-testid="completed-icon"><!-- Checkmark --></svg>
+                  <h3>Introduction: Database Basics</h3>
+                  <p>&lt;1 min</p>
+                </div>
+                <span>Complete</span>
+              </button>
+
+              <!-- ANOTHER COMPLETED LESSON -->
+              <button type="button">
+                <svg data-testid="completed-icon"></svg>
+                <h3>Types of Databases</h3>
+                <p>&lt;1 min</p>
+                <span>Complete</span>
+              </button>
+
+              <!-- NOT STARTED LESSON (no completed-icon) -->
+              <button type="button">
+                <h3>Using PostgreSQL On Your Own Computer</h3>
+                <p>2 min</p>
+                <!-- No "Complete" span -->
+              </button>
+
+            </ul>
+          </div>
+        </li>
+
+        <!-- NOT STARTED MODULE (no status icon at all) -->
+        <li>
+          <button aria-expanded="false">
+            <h2>Working with Databases</h2>
+            <!-- No checkmark, no progress circle -->
+          </button>
+          <div style="height: 0px;"></div>
+        </li>
+
+        <!-- Pattern continues for remaining modules... -->
+
+      </ul>
+
+      <!-- FOOTER LINK -->
+      <div>
+        <a data-testid="syllabus-link" href="/career-journey/full-stack-engineer">
+          View syllabus page
+        </a>
+      </div>
+
+    </section>
+  </div>
+</div>
+
+<!-- 
+KEY SELECTORS FOR DOM EXTRACTION:
+=================================
+
+Course Name:
+  h1 .gamut-zz6qte-StyledText
+
+All Modules:
+  [data-testid="tracks-accordions-list"] > li
+
+Module Title:
+  li > div > button h2
+
+Module Status Detection:
+  - Completed: has <svg> with mask id containing "CheckFilledIcon"
+  - In Progress: has <figure class="...RadialProgressWrapper">
+    - Progress %: figure > figcaption text content
+  - Not Started: has neither icon
+
+Accordion State:
+  button[aria-expanded="true"] = expanded
+  button[aria-expanded="false"] = collapsed
+
+Lessons (when accordion expanded):
+  ul > button (each button is a lesson)
+  
+Lesson Title:
+  button h3
+
+Lesson Duration:
+  button p (contains time like "2 min" or "<1 min")
+
+Lesson Status:
+  - Completed: has svg[data-testid="completed-icon"]
+  - Not Started: no completed-icon
+-->
