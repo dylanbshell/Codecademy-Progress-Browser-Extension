@@ -45,60 +45,151 @@ function extractCodecademyProgress() {
  */
 function extractFromApolloCache() {
   try {
-    // Look for React Fiber nodes that might contain progress data
-    const rootElement = document.querySelector('#app, [data-reactroot], #root');
-    if (!rootElement) return null;
+    console.log('[Apollo] Attempting to extract from React/Apollo state...');
 
-    // Try to access React Fiber
-    const fiberKey = Object.keys(rootElement).find(key =>
-      key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance')
-    );
-
-    if (!fiberKey) {
-      console.log('No React Fiber found');
-      return null;
+    // Method 1: Check for Apollo Client cache on window
+    if (window.__APOLLO_CLIENT__) {
+      console.log('[Apollo] Found window.__APOLLO_CLIENT__');
+      const cache = window.__APOLLO_CLIENT__.cache;
+      if (cache) {
+        const extracted = cache.extract();
+        console.log('[Apollo] Cache keys:', Object.keys(extracted).slice(0, 10).join(', '));
+        const result = parseApolloCache(extracted);
+        if (result) return result;
+      }
     }
 
-    console.log('Searching React state for progress data...');
-
-    // Search through React tree for progress data
-    const progressData = searchReactTree(rootElement[fiberKey]);
-
-    if (progressData) {
-      console.log('Found progress data in React state!', progressData);
-      return progressData;
+    // Method 2: Check for Apollo State
+    if (window.__APOLLO_STATE__) {
+      console.log('[Apollo] Found window.__APOLLO_STATE__');
+      const result = parseApolloCache(window.__APOLLO_STATE__);
+      if (result) return result;
     }
 
-    console.log('No progress data found in React state');
+    // Method 3: Look for React Fiber on various possible root elements
+    const possibleRoots = [
+      document.querySelector('#app'),
+      document.querySelector('[data-reactroot]'),
+      document.querySelector('#root'),
+      document.querySelector('#__next'),
+      document.querySelector('[id*="react"]'),
+      document.body.firstElementChild,
+      document.querySelector('main'),
+      document.querySelector('[class*="App"]'),
+      document.querySelector('[data-testid="syllabus-browser-content"]')?.closest('div'),
+    ].filter(Boolean);
+
+    console.log('[Apollo] Checking', possibleRoots.length, 'possible root elements');
+
+    for (const rootElement of possibleRoots) {
+      const allKeys = Object.keys(rootElement);
+      const fiberKey = allKeys.find(key =>
+        key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance')
+      );
+
+      if (fiberKey) {
+        console.log('[Apollo] Found React Fiber on:', rootElement.tagName, rootElement.id || rootElement.className?.slice(0, 30));
+        console.log('[Apollo] Fiber key:', fiberKey);
+
+        const progressData = searchReactTree(rootElement[fiberKey]);
+        if (progressData) {
+          return progressData;
+        }
+      }
+    }
+
+    console.log('[Apollo] No React Fiber found on any root element');
     return null;
   } catch (error) {
-    console.log('Error extracting from Apollo cache:', error);
+    console.log('[Apollo] Error extracting from Apollo cache:', error.message);
+    console.error(error);
     return null;
   }
 }
 
 /**
+ * Parse Apollo cache data to extract progress information
+ */
+function parseApolloCache(cacheData) {
+  console.log('[Apollo] Parsing cache data...');
+
+  const completed = [];
+  let currentModule = null;
+
+  try {
+    // Look for ContentItemProgressSummary objects in the cache
+    for (const key of Object.keys(cacheData)) {
+      const item = cacheData[key];
+
+      if (item?.__typename === 'ContentItemProgressSummary') {
+        console.log('[Apollo] Found progress item:', key, 'completed:', item.completed, 'userCompleted:', item.userCompleted);
+      }
+
+      // Look for track/module data
+      if (item?.title && (item.completed === true || item.userCompleted === true)) {
+        if (!item.title.toLowerCase().includes('welcome to')) {
+          completed.push(item.title);
+        }
+      }
+    }
+
+    if (completed.length > 0) {
+      console.log('[Apollo] Found', completed.length, 'completed items in cache');
+      return {
+        careerPath: 'Full-Stack Engineer',
+        overallProgress: null,
+        currentModule: currentModule,
+        completedModules: completed,
+        recentLessons: [],
+        timestamp: new Date().toISOString()
+      };
+    }
+  } catch (error) {
+    console.log('[Apollo] Error parsing cache:', error.message);
+  }
+
+  return null;
+}
+
+/**
  * Recursively search React tree for progress data
  */
+let nodesVisited = 0;
+let interestingKeys = new Set();
+
 function searchReactTree(node, depth = 0, maxDepth = 15) {
+  if (depth === 0) {
+    nodesVisited = 0;
+    interestingKeys = new Set();
+  }
+
   if (!node || depth > maxDepth) return null;
+  nodesVisited++;
 
   try {
     // Check if this node has memoizedProps or memoizedState with progress data
     const props = node.memoizedProps || {};
     const state = node.memoizedState || {};
 
+    // Log node type for debugging (only first few at each depth level)
+    if (depth <= 3 && nodesVisited <= 20) {
+      const nodeType = node.type?.name || node.type?.displayName || (typeof node.type === 'string' ? node.type : 'unknown');
+      console.log(`[Apollo] Visiting node depth=${depth}: ${nodeType}`);
+    }
+
     // Look for arrays that might contain module/track data
-    const checkForProgressData = (obj) => {
+    const checkForProgressData = (obj, path = 'root') => {
       if (!obj || typeof obj !== 'object') return null;
 
       // Look for track/module arrays
       if (Array.isArray(obj)) {
         // Check if this looks like a list of tracks/modules
-        if (obj.length > 10 && obj[0] && typeof obj[0] === 'object') {
+        if (obj.length > 5 && obj[0] && typeof obj[0] === 'object') {
           const first = obj[0];
+          const keys = Object.keys(first).slice(0, 5).join(', ');
+          console.log(`[Apollo] Found array at ${path} with ${obj.length} items, first item keys: ${keys}`);
           if (first.title || first.name || first.displayName) {
-            console.log(`Found potential progress array with ${obj.length} items`);
+            console.log(`[Apollo] Array has title/name/displayName - extracting progress...`);
             return extractProgressFromArray(obj);
           }
         }
@@ -106,8 +197,10 @@ function searchReactTree(node, depth = 0, maxDepth = 15) {
 
       // Recursively check object properties
       for (const key in obj) {
-        if (key.includes('track') || key.includes('module') || key.includes('progress') || key.includes('syllabus')) {
-          const result = checkForProgressData(obj[key]);
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes('track') || lowerKey.includes('module') || lowerKey.includes('progress') || lowerKey.includes('syllabus') || lowerKey.includes('content') || lowerKey.includes('data')) {
+          interestingKeys.add(key);
+          const result = checkForProgressData(obj[key], `${path}.${key}`);
           if (result) return result;
         }
       }
@@ -129,7 +222,16 @@ function searchReactTree(node, depth = 0, maxDepth = 15) {
     if (siblingResult) return siblingResult;
 
   } catch (error) {
-    // Silently continue on errors
+    // Log errors at shallow depths
+    if (depth <= 2) {
+      console.log(`[Apollo] Error at depth ${depth}:`, error.message);
+    }
+  }
+
+  // Log summary when returning from root
+  if (depth === 0) {
+    console.log(`[Apollo] Tree search complete. Nodes visited: ${nodesVisited}`);
+    console.log(`[Apollo] Interesting keys found: ${[...interestingKeys].join(', ') || 'none'}`);
   }
 
   return null;
@@ -139,10 +241,13 @@ function searchReactTree(node, depth = 0, maxDepth = 15) {
  * Extract progress data from an array of tracks/modules
  */
 function extractProgressFromArray(arr) {
+  console.log(`[Apollo] Extracting progress from array of ${arr.length} items...`);
+
   const completed = [];
   let currentModule = null;
 
-  for (const item of arr) {
+  for (let i = 0; i < arr.length; i++) {
+    const item = arr[i];
     const name = item.title || item.displayName || item.name;
     if (!name) continue;
 
@@ -155,6 +260,11 @@ function extractProgressFromArray(arr) {
       item.percentComplete === 100 ||
       item.status === 'completed' ||
       item.state === 'completed';
+
+    // Log first few items for debugging
+    if (i < 5) {
+      console.log(`[Apollo] Item ${i}: "${name}" - completed=${item.completed}, isCompleted=${item.isCompleted}, progress=${item.progress}, status=${item.status}`);
+    }
 
     if (isComplete && !name.toLowerCase().includes('welcome to')) {
       completed.push(name);
@@ -169,6 +279,8 @@ function extractProgressFromArray(arr) {
     }
   }
 
+  console.log(`[Apollo] Extraction result: ${completed.length} completed, current="${currentModule?.name || 'none'}"`);
+
   if (completed.length > 0 || currentModule) {
     return {
       careerPath: 'Full-Stack Engineer',
@@ -180,6 +292,7 @@ function extractProgressFromArray(arr) {
     };
   }
 
+  console.log('[Apollo] No completed modules or current module found in array');
   return null;
 }
 
@@ -302,55 +415,117 @@ function extractAllModules() {
       if (moduleNameEl) {
         const name = moduleNameEl.textContent.trim();
 
+        // Debug: log first 3 modules in detail
+        if (index < 3) {
+          console.log(`[Debug] Module ${index} "${name}" HTML structure:`);
+          // Log all data-testid attributes
+          const testIds = item.querySelectorAll('[data-testid]');
+          testIds.forEach(el => console.log(`  data-testid: "${el.getAttribute('data-testid')}"`));
+          // Log aria attributes
+          const ariaElements = item.querySelectorAll('[aria-label], [aria-checked], [aria-selected]');
+          ariaElements.forEach(el => {
+            console.log(`  aria: label="${el.getAttribute('aria-label')}", checked="${el.getAttribute('aria-checked')}"`);
+          });
+        }
+
         // Multiple strategies to detect completion:
-        // 1. Check for completed icon (most reliable)
-        let hasCompletedIcon = item.querySelector('[data-testid="completed-icon"]');
+        let isCompleted = false;
+        let detectionMethod = '';
 
-        // 2. Check for SVG with specific viewBox that indicates checkmark
-        if (!hasCompletedIcon) {
-          const svgs = item.querySelectorAll('svg');
-          if (index < 3) { // Log first 3 modules for debugging
-            console.log(`  Module ${index} has ${svgs.length} SVGs`);
+        // 1. Check for completed icon data-testid (most reliable)
+        if (item.querySelector('[data-testid="completed-icon"]')) {
+          isCompleted = true;
+          detectionMethod = 'completed-icon testid';
+        }
+
+        // 2. Check for any data-testid containing "complete" or "check"
+        if (!isCompleted) {
+          const completeTestIds = item.querySelectorAll('[data-testid*="complete"], [data-testid*="check"], [data-testid*="done"]');
+          if (completeTestIds.length > 0) {
+            isCompleted = true;
+            detectionMethod = `testid: ${completeTestIds[0].getAttribute('data-testid')}`;
           }
-          for (const svg of svgs) {
-            // Log SVG attributes for debugging
-            if (index < 3) {
-              const viewBox = svg.getAttribute('viewBox');
-              const fill = svg.getAttribute('fill');
-              console.log(`    SVG: viewBox=${viewBox}, fill=${fill}`);
-            }
+        }
 
-            // Completed icons often have specific SVG structure
-            const path = svg.querySelector('path');
-            const circle = svg.querySelector('circle');
-            // If it has a circle and path (checkmark pattern), it's likely a completed icon
-            if (circle && path) {
-              hasCompletedIcon = svg;
-              if (index < 3) console.log(`    -> Found circle+path pattern (completed icon)`);
+        // 3. Check aria-label for completion indicators
+        if (!isCompleted) {
+          const allElements = item.querySelectorAll('*');
+          for (const el of allElements) {
+            const ariaLabel = el.getAttribute('aria-label')?.toLowerCase() || '';
+            if (ariaLabel.includes('complete') || ariaLabel.includes('finished') || ariaLabel.includes('done')) {
+              isCompleted = true;
+              detectionMethod = `aria-label: ${ariaLabel}`;
               break;
             }
           }
         }
 
-        // 3. Check for green color indicators (checkmarks are usually green)
-        if (!hasCompletedIcon) {
-          const coloredElements = item.querySelectorAll('[fill="#10DC60"], [fill="#00D68F"], [fill="green"], [fill="#10B981"]');
-          if (coloredElements.length > 0) {
-            hasCompletedIcon = coloredElements[0];
+        // 4. Check for "100%" text in the module item
+        if (!isCompleted) {
+          const textContent = item.textContent || '';
+          if (textContent.includes('100%')) {
+            isCompleted = true;
+            detectionMethod = '100% text';
           }
         }
 
-        // 4. Check button element for specific classes that might indicate completion
-        const button = item.querySelector('button');
-        let isCompleted = hasCompletedIcon !== null;
+        // 5. Check for green/success colored SVGs (various green shades)
+        if (!isCompleted) {
+          const svgs = item.querySelectorAll('svg');
+          for (const svg of svgs) {
+            const fill = svg.getAttribute('fill') || '';
+            const stroke = svg.getAttribute('stroke') || '';
+            const style = svg.getAttribute('style') || '';
+            const className = svg.className?.baseVal || svg.className || '';
 
-        if (!isCompleted && button) {
-          const buttonClass = button.className || '';
-          // Some platforms use class names to indicate state
-          isCompleted = buttonClass.includes('complete') || buttonClass.includes('done');
+            // Check for green colors
+            const greenColors = ['#10DC60', '#00D68F', '#10B981', '#22C55E', '#4ADE80', 'green', 'rgb(16, 220, 96)', 'rgb(0, 214, 143)'];
+            const isGreen = greenColors.some(c =>
+              fill.includes(c) || stroke.includes(c) || style.includes(c)
+            ) || className.includes('success') || className.includes('complete');
+
+            if (isGreen) {
+              isCompleted = true;
+              detectionMethod = `green SVG: fill=${fill}`;
+              break;
+            }
+
+            // Also check path/circle fill colors
+            const paths = svg.querySelectorAll('path, circle');
+            for (const path of paths) {
+              const pathFill = path.getAttribute('fill') || '';
+              if (greenColors.some(c => pathFill.includes(c))) {
+                isCompleted = true;
+                detectionMethod = `green path: ${pathFill}`;
+                break;
+              }
+            }
+            if (isCompleted) break;
+          }
         }
 
-        console.log(`Module ${index}: "${name}" - Completed: ${isCompleted}` + (hasCompletedIcon ? ` (icon found)` : ''));
+        // 6. Check button element for completion classes
+        if (!isCompleted) {
+          const button = item.querySelector('button');
+          if (button) {
+            const buttonClass = button.className || '';
+            if (buttonClass.includes('complete') || buttonClass.includes('done') || buttonClass.includes('finished')) {
+              isCompleted = true;
+              detectionMethod = 'button class';
+            }
+          }
+        }
+
+        // 7. Check for specific class patterns on the li or its children
+        if (!isCompleted) {
+          const allClasses = item.className + ' ' + Array.from(item.querySelectorAll('*')).map(el => el.className).join(' ');
+          if (allClasses.includes('completed') || allClasses.includes('is-complete') || allClasses.includes('--complete')) {
+            isCompleted = true;
+            detectionMethod = 'CSS class';
+          }
+        }
+
+        console.log(`Module ${index}: "${name}" - Completed: ${isCompleted}` + (detectionMethod ? ` (${detectionMethod})` : ''));
 
         // Try to find progress percentage
         const percentageMatch = item.textContent.match(/(\d+)%/);
