@@ -432,33 +432,37 @@ function extractAllModules() {
         let isCompleted = false;
         let detectionMethod = '';
 
-        // 1. Check for completed icon data-testid (most reliable)
-        if (item.querySelector('[data-testid="completed-icon"]')) {
+        // 1. Check for CheckFilledIcon mask in SVG (Codecademy's completed checkmark)
+        const svgs = item.querySelectorAll('svg');
+        for (const svg of svgs) {
+          const masks = svg.querySelectorAll('mask');
+          for (const mask of masks) {
+            const maskId = mask.getAttribute('id') || '';
+            if (maskId.includes('CheckFilledIcon')) {
+              isCompleted = true;
+              detectionMethod = 'CheckFilledIcon mask';
+              break;
+            }
+          }
+          if (isCompleted) break;
+
+          // Also check innerHTML for CheckFilledIcon (in case mask is nested differently)
+          if (svg.innerHTML.includes('CheckFilledIcon')) {
+            isCompleted = true;
+            detectionMethod = 'CheckFilledIcon in SVG';
+            break;
+          }
+        }
+
+        // 2. Check for completed icon data-testid
+        if (!isCompleted && item.querySelector('[data-testid="completed-icon"]')) {
           isCompleted = true;
           detectionMethod = 'completed-icon testid';
         }
 
-        // 2. Check for any data-testid containing "complete" or "check"
-        if (!isCompleted) {
-          const completeTestIds = item.querySelectorAll('[data-testid*="complete"], [data-testid*="check"], [data-testid*="done"]');
-          if (completeTestIds.length > 0) {
-            isCompleted = true;
-            detectionMethod = `testid: ${completeTestIds[0].getAttribute('data-testid')}`;
-          }
-        }
-
-        // 3. Check aria-label for completion indicators
-        if (!isCompleted) {
-          const allElements = item.querySelectorAll('*');
-          for (const el of allElements) {
-            const ariaLabel = el.getAttribute('aria-label')?.toLowerCase() || '';
-            if (ariaLabel.includes('complete') || ariaLabel.includes('finished') || ariaLabel.includes('done')) {
-              isCompleted = true;
-              detectionMethod = `aria-label: ${ariaLabel}`;
-              break;
-            }
-          }
-        }
+        // 3. Check for in-progress icon (means started but not complete)
+        // We note this for progress tracking but don't mark as complete
+        const inProgressIcon = item.querySelector('[data-testid="in-progress-icon"]');
 
         // 4. Check for "100%" text in the module item
         if (!isCompleted) {
@@ -469,59 +473,16 @@ function extractAllModules() {
           }
         }
 
-        // 5. Check for green/success colored SVGs (various green shades)
+        // 5. Check aria-label for completion indicators
         if (!isCompleted) {
-          const svgs = item.querySelectorAll('svg');
-          for (const svg of svgs) {
-            const fill = svg.getAttribute('fill') || '';
-            const stroke = svg.getAttribute('stroke') || '';
-            const style = svg.getAttribute('style') || '';
-            const className = svg.className?.baseVal || svg.className || '';
-
-            // Check for green colors
-            const greenColors = ['#10DC60', '#00D68F', '#10B981', '#22C55E', '#4ADE80', 'green', 'rgb(16, 220, 96)', 'rgb(0, 214, 143)'];
-            const isGreen = greenColors.some(c =>
-              fill.includes(c) || stroke.includes(c) || style.includes(c)
-            ) || className.includes('success') || className.includes('complete');
-
-            if (isGreen) {
+          const allElements = item.querySelectorAll('*');
+          for (const el of allElements) {
+            const ariaLabel = el.getAttribute('aria-label')?.toLowerCase() || '';
+            if (ariaLabel.includes('complete') || ariaLabel.includes('finished') || ariaLabel.includes('done')) {
               isCompleted = true;
-              detectionMethod = `green SVG: fill=${fill}`;
+              detectionMethod = `aria-label: ${ariaLabel}`;
               break;
             }
-
-            // Also check path/circle fill colors
-            const paths = svg.querySelectorAll('path, circle');
-            for (const path of paths) {
-              const pathFill = path.getAttribute('fill') || '';
-              if (greenColors.some(c => pathFill.includes(c))) {
-                isCompleted = true;
-                detectionMethod = `green path: ${pathFill}`;
-                break;
-              }
-            }
-            if (isCompleted) break;
-          }
-        }
-
-        // 6. Check button element for completion classes
-        if (!isCompleted) {
-          const button = item.querySelector('button');
-          if (button) {
-            const buttonClass = button.className || '';
-            if (buttonClass.includes('complete') || buttonClass.includes('done') || buttonClass.includes('finished')) {
-              isCompleted = true;
-              detectionMethod = 'button class';
-            }
-          }
-        }
-
-        // 7. Check for specific class patterns on the li or its children
-        if (!isCompleted) {
-          const allClasses = item.className + ' ' + Array.from(item.querySelectorAll('*')).map(el => el.className).join(' ');
-          if (allClasses.includes('completed') || allClasses.includes('is-complete') || allClasses.includes('--complete')) {
-            isCompleted = true;
-            detectionMethod = 'CSS class';
           }
         }
 
