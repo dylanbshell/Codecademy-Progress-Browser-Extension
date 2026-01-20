@@ -15,6 +15,7 @@ const completedModulesSection = document.getElementById('completedModulesSection
 const completedModulesEl = document.getElementById('completedModules');
 const copyBtn = document.getElementById('copyBtn');
 const successMsg = document.getElementById('successMsg');
+const goToPathBtn = document.getElementById('goToPathBtn');
 
 // Store progress data globally
 let progressData = null;
@@ -221,5 +222,32 @@ async function copyToClipboard() {
   }
 }
 
+/**
+ * Navigate to career path page for progress extraction
+ */
+async function navigateToCareerPath() {
+  try {
+    // Try to get cached data to find the career path URL
+    const result = await chrome.storage.local.get(['cachedProgress']);
+    let targetUrl = 'https://www.codecademy.com/learn';
+
+    // If we have cached data with a URL, use that
+    if (result.cachedProgress?.pageUrl) {
+      targetUrl = result.cachedProgress.pageUrl;
+    }
+
+    // Get current tab and navigate it
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await chrome.tabs.update(tab.id, { url: targetUrl });
+
+    // Close the popup (it will reopen automatically after navigation)
+    window.close();
+  } catch (error) {
+    console.error('Navigation error:', error);
+    alert('Failed to navigate. Please manually go to your Codecademy career path page.');
+  }
+}
+
 // Event listeners
 copyBtn.addEventListener('click', copyToClipboard);
+goToPathBtn.addEventListener('click', navigateToCareerPath);
