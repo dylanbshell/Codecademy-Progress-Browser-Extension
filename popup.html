@@ -29,6 +29,17 @@
 
     <!-- Main Content -->
     <div id="content" class="content hidden">
+      <!-- Action Button -->
+      <button id="copyBtn" class="copy-btn">
+        <span class="btn-icon">📋</span>
+        Copy for AI Chat
+      </button>
+
+      <!-- Success Message -->
+      <div id="successMsg" class="success-msg hidden">
+        ✓ Copied to clipboard!
+      </div>
+
       <!-- Career Path Info -->
       <section class="section">
         <h2 id="careerPath" class="career-path">Loading...</h2>
@@ -59,17 +70,6 @@
           <!-- Populated by JavaScript -->
         </div>
       </section>
-
-      <!-- Action Button -->
-      <button id="copyBtn" class="copy-btn">
-        <span class="btn-icon">📋</span>
-        Copy for AI Chat
-      </button>
-
-      <!-- Success Message -->
-      <div id="successMsg" class="success-msg hidden">
-        ✓ Copied to clipboard!
-      </div>
     </div>
 
     <!-- Footer -->
@@ -78,6 +78,7 @@
     </footer>
   </div>
 
+  <script src="utils.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

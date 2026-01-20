@@ -1,5 +1,8 @@
 // Popup script - handles UI, data formatting, and clipboard operations
 
+// Timing constants
+const SUCCESS_MESSAGE_DURATION = 2000; // How long to show the success message
+
 // DOM elements
 const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
@@ -190,7 +193,7 @@ function formatForAI(data) {
   // Add AI instruction
   text += 'Please quiz me with 5-7 quick recall questions focused on my most recently completed lesson. ';
   text += 'After that, quiz me with 5-7 quick recall questions about any of the lessons I\'ve completed so far. ';
-  text += 'After each answer, provide a brief explanation. Ready when you say "start".';
+  text += 'After each answer, provide a brief explanation. Continue quizzing me like this until say otherwise. Ready when I say "start".';
 
   return text;
 }
@@ -211,34 +214,15 @@ async function copyToClipboard() {
     successMsg.classList.remove('hidden');
     copyBtn.classList.add('success');
 
-    // Hide after 2 seconds
+    // Hide after timeout
     setTimeout(() => {
       successMsg.classList.add('hidden');
       copyBtn.classList.remove('success');
-    }, 2000);
+    }, SUCCESS_MESSAGE_DURATION);
   } catch (error) {
     console.error('Failed to copy:', error);
     alert('Failed to copy to clipboard. Please try again.');
   }
-}
-
-/**
- * Parse career path base URL from any Codecademy URL
- */
-function parseCareerPathUrl(url) {
-  // Match pattern: /journeys/{name}/paths/{name}
-  const journeyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+\/paths\/[^\/]+)/);
-  if (journeyMatch) {
-    return journeyMatch[1];
-  }
-
-  // Match pattern: /journeys/{name}
-  const journeyOnlyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+)/);
-  if (journeyOnlyMatch) {
-    return journeyOnlyMatch[1];
-  }
-
-  return null;
 }
 
 /**
@@ -247,7 +231,7 @@ function parseCareerPathUrl(url) {
 async function navigateToCareerPath() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    let targetUrl = 'https://www.codecademy.com/learn';
+    let targetUrl = null;
 
     // Try to parse the current tab's URL first
     if (tab.url && tab.url.includes('codecademy.com')) {
@@ -258,11 +242,19 @@ async function navigateToCareerPath() {
     }
 
     // If no parsed URL, try cached data
-    if (targetUrl === 'https://www.codecademy.com/learn') {
+    if (!targetUrl) {
       const result = await chrome.storage.local.get(['cachedProgress']);
-      if (result.cachedProgress?.pageUrl) {
+      if (result.cachedProgress?.pageUrl &&
+          result.cachedProgress.pageUrl !== 'https://www.codecademy.com/learn') {
         targetUrl = result.cachedProgress.pageUrl;
+        console.log('Using cached URL:', targetUrl);
       }
+    }
+
+    // If still no URL, default to learn page
+    if (!targetUrl) {
+      targetUrl = 'https://www.codecademy.com/learn';
+      console.log('No cached career path found, using default:', targetUrl);
     }
 
     // Navigate to the target URL

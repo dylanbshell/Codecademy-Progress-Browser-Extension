@@ -1,92 +1,131 @@
 // Content script for extracting Codecademy progress data
 // This runs on Codecademy pages and extracts career path progress
 
+// Timing constants for sidebar navigation
+const SIDEBAR_OPEN_DELAY = 300; // Delay after opening sidebar
+const SIDEBAR_NAVIGATION_DELAY = 300; // Delay after clicking Syllabus button
+const FULL_EXTRACTION_DELAY = 1500; // Total delay before extracting data
+const AUTO_EXTRACT_DELAY = 2000; // Delay for auto-extract on page load
+
+// Sidebar toggle selectors
+const SIDEBAR_TOGGLE_SELECTORS = [
+  '[data-testid="syllabus-toggle"]',
+  '[data-testid="sidebar-toggle"]',
+  'button[aria-label*="syllabus" i]',
+  'button[aria-label*="sidebar" i]',
+  'button[aria-label*="menu" i]',
+  '[class*="syllabus"][class*="toggle"]',
+  '[class*="sidebar"][class*="toggle"]'
+];
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractProgress') {
-    // Try to open the syllabus sidebar first
-    openSyllabusSidebar();
-
-    // Wait for sidebar to fully open and navigate (300ms + 300ms + buffer for DOM updates)
-    setTimeout(() => {
-      const progressData = extractCodecademyProgress();
-      sendResponse({ success: true, data: progressData });
-    }, 1500);
-
+    // Handle extraction asynchronously
+    handleProgressExtraction().then(data => {
+      sendResponse({ success: true, data });
+    });
     return true; // Keep message channel open for async response
   }
   return true;
 });
 
 /**
- * Automatically open the syllabus sidebar if it's not already open
+ * Handle the full progress extraction flow
  */
-function openSyllabusSidebar() {
-  // Check if the full syllabus is already showing
+async function handleProgressExtraction() {
+  await openSyllabusSidebar();
+  await delay(FULL_EXTRACTION_DELAY);
+  return extractCodecademyProgress();
+}
+
+/**
+ * Check if the sidebar with full syllabus is already open
+ */
+function isSidebarOpen() {
   const tracksList = document.querySelector('[data-testid="tracks-accordions-list"]');
-  if (tracksList && tracksList.offsetParent !== null) {
-    // Sidebar is already open with full syllabus
-    return;
-  }
+  return tracksList && tracksList.offsetParent !== null;
+}
 
-  // Step 1: First, open the sidebar if it's not open
-  const toggleSelectors = [
-    '[data-testid="syllabus-toggle"]',
-    '[data-testid="sidebar-toggle"]',
-    'button[aria-label*="syllabus" i]',
-    'button[aria-label*="sidebar" i]',
-    'button[aria-label*="menu" i]',
-    '[class*="syllabus"][class*="toggle"]',
-    '[class*="sidebar"][class*="toggle"]'
-  ];
-
-  let sidebarOpened = false;
-  for (const selector of toggleSelectors) {
+/**
+ * Click the sidebar toggle button to open the sidebar
+ */
+function clickSidebarToggle() {
+  // Try predefined selectors first
+  for (const selector of SIDEBAR_TOGGLE_SELECTORS) {
     const toggle = document.querySelector(selector);
     if (toggle) {
       toggle.click();
-      sidebarOpened = true;
-      break;
+      return true;
     }
   }
 
   // Fallback: look for any button with syllabus/menu-related text
-  if (!sidebarOpened) {
-    const buttons = document.querySelectorAll('button');
-    for (const button of buttons) {
-      const text = button.textContent.toLowerCase();
-      const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-      if ((text.includes('syllabus') || text.includes('menu') ||
-           ariaLabel.includes('syllabus') || ariaLabel.includes('menu')) &&
-          !text.includes('back')) {
-        button.click();
-        sidebarOpened = true;
-        break;
-      }
+  const buttons = document.querySelectorAll('button');
+  for (const button of buttons) {
+    const text = button.textContent.toLowerCase();
+    const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+    if ((text.includes('syllabus') || text.includes('menu') ||
+         ariaLabel.includes('syllabus') || ariaLabel.includes('menu')) &&
+        !text.includes('back')) {
+      button.click();
+      return true;
     }
   }
 
-  // Step 2: After sidebar opens, navigate to full syllabus view
-  if (sidebarOpened) {
-    setTimeout(() => {
-      // Click the "Syllabus" button if it exists
-      const buttons = document.querySelectorAll('button');
-      for (const button of buttons) {
-        const span = button.querySelector('span');
-        if (span && span.textContent.trim() === 'Syllabus') {
-          button.click();
+  return false;
+}
 
-          // Step 3: Click the back button to show full syllabus
-          setTimeout(() => {
-            const backButton = document.querySelector('[data-testid="back-button"]');
-            if (backButton) {
-              backButton.click();
-            }
-          }, 300);
-          break;
-        }
-      }
-    }, 300);
+/**
+ * Click the "Syllabus" button in the sidebar
+ */
+function clickSyllabusButton() {
+  const buttons = document.querySelectorAll('button');
+  for (const button of buttons) {
+    const span = button.querySelector('span');
+    if (span && span.textContent.trim() === 'Syllabus') {
+      button.click();
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Click the back button to show full syllabus
+ */
+function clickBackButton() {
+  const backButton = document.querySelector('[data-testid="back-button"]');
+  if (backButton) {
+    backButton.click();
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Automatically open the syllabus sidebar if it's not already open
+ */
+async function openSyllabusSidebar() {
+  // Check if the full syllabus is already showing
+  if (isSidebarOpen()) {
+    return;
+  }
+
+  // Step 1: Open the sidebar
+  const sidebarOpened = clickSidebarToggle();
+  if (!sidebarOpened) {
+    return;
+  }
+
+  // Step 2: Navigate to the Syllabus view
+  await delay(SIDEBAR_OPEN_DELAY);
+  const syllabusClicked = clickSyllabusButton();
+
+  if (syllabusClicked) {
+    // Step 3: Click back to show full syllabus
+    await delay(SIDEBAR_NAVIGATION_DELAY);
+    clickBackButton();
   }
 }
 
@@ -95,22 +134,7 @@ function openSyllabusSidebar() {
  * Returns a clean URL that points to the syllabus overview
  */
 function extractCareerPathUrl() {
-  const url = window.location.href;
-
-  // Match pattern: /journeys/{name}/paths/{name}
-  const journeyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+\/paths\/[^\/]+)/);
-  if (journeyMatch) {
-    return journeyMatch[1];
-  }
-
-  // Match pattern: /journeys/{name} (fallback to journey level)
-  const journeyOnlyMatch = url.match(/^(https:\/\/www\.codecademy\.com\/journeys\/[^\/]+)/);
-  if (journeyOnlyMatch) {
-    return journeyOnlyMatch[1];
-  }
-
-  // If we can't parse it, return the current URL (it might already be the right page)
-  return url;
+  return parseCareerPathUrl(window.location.href) || window.location.href;
 }
 
 /**
@@ -138,7 +162,7 @@ function extractCareerPath() {
   const syllabusH1 = document.querySelector('[data-testid="syllabus-browser-content"] h1');
   if (syllabusH1?.textContent?.trim()) {
     const text = syllabusH1.textContent.trim();
-    if (!text.includes(':') && text.length < 50) {
+    if (!text.includes(':') && text.length < 50 && text !== 'Menu') {
       return text;
     }
   }
@@ -149,6 +173,7 @@ function extractCareerPath() {
     const text = h1.textContent.trim();
     if (text &&
         text.length < 50 &&
+        text !== 'Menu' &&
         !text.includes(':') &&
         !text.includes('Installing') &&
         !text.includes('Introduction:') &&
@@ -345,5 +370,5 @@ window.addEventListener('load', () => {
   setTimeout(() => {
     const data = extractCodecademyProgress();
     chrome.storage.local.set({ cachedProgress: data });
-  }, 2000);
+  }, AUTO_EXTRACT_DELAY);
 });
