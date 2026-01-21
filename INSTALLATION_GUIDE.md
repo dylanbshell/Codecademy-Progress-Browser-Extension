@@ -2,17 +2,7 @@
 
 Your Codecademy Progress Tracker extension is ready! Follow these steps to get it running.
 
-## Step 1: Add an Icon (Optional)
-
-The extension needs a PNG icon to display in Chrome. You have two options:
-
-### Quick Test (No Icon)
-Skip this step for now - the extension will work with Chrome's default icon.
-
-### Add Custom Icon
-See `assets/ICON_INSTRUCTIONS.md` for several easy ways to get an icon.
-
-## Step 2: Load the Extension
+## Step 1: Load the Extension
 
 1. **Open Chrome Extensions Page**
    - Navigate to `chrome://extensions/`
@@ -31,7 +21,7 @@ See `assets/ICON_INSTRUCTIONS.md` for several easy ways to get an icon.
    - The extension icon appears in your Chrome toolbar (puzzle piece icon)
    - Pin it for easy access: click the puzzle icon → pin
 
-## Step 3: Test It Out
+## Step 2: Test It Out
 
 1. **Go to Codecademy**
    - Visit https://www.codecademy.com/learn
@@ -86,9 +76,13 @@ Codecademy Progress Browser Extension/
 ├── content.js            ✓ Data extraction from Codecademy
 ├── popup.html            ✓ Extension UI
 ├── popup.js              ✓ UI logic & formatting
+├── utils.js              ✓ Utility functions
 ├── styles.css            ✓ Styling
+├── icon16.png            ✓ Extension icon (16x16)
+├── icon48.png            ✓ Extension icon (48x48)
+├── icon128.png           ✓ Extension icon (128x128)
 ├── assets/
-│   ├── icon.svg          ✓ SVG icon (needs conversion)
+│   ├── icon.svg          ✓ SVG icon source
 │   └── ICON_INSTRUCTIONS.md
 ├── README.md             ✓ Project documentation
 ├── AGENTS.md             ✓ AI context
