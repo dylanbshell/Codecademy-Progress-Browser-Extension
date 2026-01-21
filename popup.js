@@ -187,10 +187,10 @@ function displayProgress(data) {
     data.completedModules && data.completedModules.length > 0,
     () => {
       completedModulesEl.innerHTML = '';
-      data.completedModules.forEach(module => {
+      data.completedModules.forEach((module, index) => {
         const chip = document.createElement('span');
         chip.className = 'module-chip';
-        chip.textContent = module;
+        chip.textContent = `${index + 1}. ${module}`;
         completedModulesEl.appendChild(chip);
       });
     }
