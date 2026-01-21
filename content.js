@@ -7,6 +7,14 @@ const SIDEBAR_NAVIGATION_DELAY = 300; // Delay after clicking Syllabus button
 const FULL_EXTRACTION_DELAY = 1500; // Total delay before extracting data
 const AUTO_EXTRACT_DELAY = 2000; // Delay for auto-extract on page load
 
+// Data extraction constants
+const MAX_RECENT_LESSONS = 10; // Maximum number of recent lessons to extract
+const MAX_CAREER_PATH_NAME_LENGTH = 50; // Maximum length for career path names
+const MIN_MODULE_NAME_LENGTH = 3; // Minimum length for module names
+const MIN_LESSON_NAME_LENGTH = 3; // Minimum length for lesson names
+const MAX_LESSON_NAME_LENGTH = 150; // Maximum length for lesson names
+const MIN_FALLBACK_MODULE_NAME_LENGTH = 3; // Minimum length for fallback module extraction
+
 // Sidebar toggle selectors
 const SIDEBAR_TOGGLE_SELECTORS = [
   '[data-testid="syllabus-toggle"]',
@@ -34,9 +42,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  * Handle the full progress extraction flow
  */
 async function handleProgressExtraction() {
-  await openSyllabusSidebar();
-  await delay(FULL_EXTRACTION_DELAY);
-  return extractCodecademyProgress();
+  try {
+    logger.debug('Starting progress extraction');
+    await openSyllabusSidebar();
+    await delay(FULL_EXTRACTION_DELAY);
+    const data = extractCodecademyProgress();
+    logger.debug('Progress extraction completed', data);
+    return data;
+  } catch (error) {
+    logger.error('Failed to extract progress', error);
+    throw error;
+  }
 }
 
 /**
@@ -107,25 +123,36 @@ function clickBackButton() {
  * Automatically open the syllabus sidebar if it's not already open
  */
 async function openSyllabusSidebar() {
-  // Check if the full syllabus is already showing
-  if (isSidebarOpen()) {
-    return;
-  }
+  try {
+    // Check if the full syllabus is already showing
+    if (isSidebarOpen()) {
+      logger.debug('Sidebar already open');
+      return;
+    }
 
-  // Step 1: Open the sidebar
-  const sidebarOpened = clickSidebarToggle();
-  if (!sidebarOpened) {
-    return;
-  }
+    // Step 1: Open the sidebar
+    const sidebarOpened = clickSidebarToggle();
+    if (!sidebarOpened) {
+      logger.warn('Could not find sidebar toggle button');
+      return;
+    }
+    logger.debug('Sidebar toggle clicked');
 
-  // Step 2: Navigate to the Syllabus view
-  await delay(SIDEBAR_OPEN_DELAY);
-  const syllabusClicked = clickSyllabusButton();
+    // Step 2: Navigate to the Syllabus view
+    await delay(SIDEBAR_OPEN_DELAY);
+    const syllabusClicked = clickSyllabusButton();
 
-  if (syllabusClicked) {
-    // Step 3: Click back to show full syllabus
-    await delay(SIDEBAR_NAVIGATION_DELAY);
-    clickBackButton();
+    if (syllabusClicked) {
+      logger.debug('Syllabus button clicked');
+      // Step 3: Click back to show full syllabus
+      await delay(SIDEBAR_NAVIGATION_DELAY);
+      const backClicked = clickBackButton();
+      if (backClicked) {
+        logger.debug('Back button clicked - full syllabus should be visible');
+      }
+    }
+  } catch (error) {
+    logger.error('Error opening syllabus sidebar', error);
   }
 }
 
@@ -141,17 +168,41 @@ function extractCareerPathUrl() {
  * Main extraction function - gathers all progress data from the page
  */
 function extractCodecademyProgress() {
-  const allModules = extractAllModules();
+  try {
+    const allModules = extractAllModules();
+    logger.debug(`Extracted ${allModules.length} modules`);
 
-  return {
-    careerPath: extractCareerPath(),
-    overallProgress: extractOverallProgress(),
-    currentModule: extractCurrentModuleFromList(allModules),
-    completedModules: extractCompletedModulesFromList(allModules),
-    recentLessons: extractRecentLessons(),
-    pageUrl: extractCareerPathUrl(),
-    timestamp: new Date().toISOString()
-  };
+    const data = {
+      careerPath: extractCareerPath(),
+      overallProgress: extractOverallProgress(),
+      currentModule: extractCurrentModuleFromList(allModules),
+      completedModules: extractCompletedModulesFromList(allModules),
+      recentLessons: extractRecentLessons(),
+      pageUrl: extractCareerPathUrl(),
+      timestamp: new Date().toISOString()
+    };
+
+    if (!data.careerPath || data.careerPath === 'Codecademy Career Path') {
+      logger.warn('Could not extract career path name, using default');
+    }
+    if (allModules.length === 0) {
+      logger.warn('No modules found - sidebar may not be open or page structure changed');
+    }
+
+    return data;
+  } catch (error) {
+    logger.error('Error during data extraction', error);
+    // Return minimal valid data structure even on error
+    return {
+      careerPath: 'Codecademy Career Path',
+      overallProgress: null,
+      currentModule: null,
+      completedModules: [],
+      recentLessons: [],
+      pageUrl: window.location.href,
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 /**
@@ -162,7 +213,7 @@ function extractCareerPath() {
   const syllabusH1 = document.querySelector('[data-testid="syllabus-browser-content"] h1');
   if (syllabusH1?.textContent?.trim()) {
     const text = syllabusH1.textContent.trim();
-    if (!text.includes(':') && text.length < 50 && text !== 'Menu') {
+    if (!text.includes(':') && text.length < MAX_CAREER_PATH_NAME_LENGTH && text !== 'Menu') {
       return text;
     }
   }
@@ -172,7 +223,7 @@ function extractCareerPath() {
   for (const h1 of allH1s) {
     const text = h1.textContent.trim();
     if (text &&
-        text.length < 50 &&
+        text.length < MAX_CAREER_PATH_NAME_LENGTH &&
         text !== 'Menu' &&
         !text.includes(':') &&
         !text.includes('Installing') &&
@@ -197,14 +248,12 @@ function extractOverallProgress() {
     '[class*="completion"]'
   ];
 
-  for (const selector of selectors) {
-    const elements = document.querySelectorAll(selector);
-    for (const element of elements) {
-      const text = element.textContent || element.getAttribute('aria-valuenow') || '';
-      const match = text.match(percentageRegex);
-      if (match) {
-        return parseInt(match[1]);
-      }
+  const elements = trySelectorsAll(selectors);
+  for (const element of elements) {
+    const text = element.textContent || element.getAttribute('aria-valuenow') || '';
+    const match = text.match(percentageRegex);
+    if (match) {
+      return parseInt(match[1]);
     }
   }
 
@@ -251,7 +300,7 @@ function extractAllModules() {
         const percentageMatch = item.textContent.match(/(\d+)%/);
         const progress = isCompleted ? 100 : (percentageMatch ? parseInt(percentageMatch[1]) : null);
 
-        if (name && name.length > 2) {
+        if (name && name.length > MIN_MODULE_NAME_LENGTH) {
           modules.push({
             name,
             progress,
@@ -268,7 +317,7 @@ function extractAllModules() {
     if (syllabusContent) {
       syllabusContent.querySelectorAll('h2').forEach(h2 => {
         const name = h2.textContent.trim();
-        if (name && name.length > 3) {
+        if (name && name.length > MIN_FALLBACK_MODULE_NAME_LENGTH) {
           modules.push({ name, progress: null, isCompleted: false });
         }
       });
@@ -289,34 +338,36 @@ function checkModuleCompleted(moduleElement) {
     return false;
   }
 
-  // Primary method: Look for CheckFilledIcon in SVG mask (Codecademy's completed checkmark)
-  // Only search within the header element to ignore child lessons
-  const svgs = moduleHeader.querySelectorAll('svg');
-  for (const svg of svgs) {
-    // Check mask IDs
-    const masks = svg.querySelectorAll('mask');
-    for (const mask of masks) {
-      if (mask.id?.includes('CheckFilledIcon')) {
-        return true;
+  // Array of checker functions to detect completion
+  const completionCheckers = [
+    // Primary: Look for CheckFilledIcon in SVG mask (Codecademy's completed checkmark)
+    (header) => {
+      const svgs = header.querySelectorAll('svg');
+      for (const svg of svgs) {
+        // Check mask IDs
+        const masks = svg.querySelectorAll('mask');
+        for (const mask of masks) {
+          if (mask.id?.includes('CheckFilledIcon')) {
+            return true;
+          }
+        }
+        // Fallback: check SVG innerHTML
+        if (svg.innerHTML.includes('CheckFilledIcon')) {
+          return true;
+        }
       }
-    }
-    // Fallback: check SVG innerHTML
-    if (svg.innerHTML.includes('CheckFilledIcon')) {
-      return true;
-    }
-  }
+      return false;
+    },
 
-  // Secondary: Check for completed-icon data-testid in header only
-  if (moduleHeader.querySelector('[data-testid="completed-icon"]')) {
-    return true;
-  }
+    // Secondary: Check for completed-icon data-testid
+    (header) => header.querySelector('[data-testid="completed-icon"]') !== null,
 
-  // Tertiary: Check for "100%" text in header only
-  if (moduleHeader.textContent?.includes('100%')) {
-    return true;
-  }
+    // Tertiary: Check for "100%" text in header
+    (header) => header.textContent?.includes('100%') || false
+  ];
 
-  return false;
+  // Run through all checkers, return true if any succeed
+  return completionCheckers.some(checker => checker(moduleHeader));
 }
 
 /**
@@ -351,7 +402,7 @@ function extractRecentLessons() {
           const lessonNameEl = item.querySelector('h3, h4, span[class*="text"], a');
           if (lessonNameEl) {
             const name = lessonNameEl.textContent.trim();
-            if (name && !seenLessons.has(name) && name.length > 3 && name.length < 150) {
+            if (name && !seenLessons.has(name) && name.length > MIN_LESSON_NAME_LENGTH && name.length < MAX_LESSON_NAME_LENGTH) {
               lessons.push(name);
               seenLessons.add(name);
             }
@@ -361,14 +412,25 @@ function extractRecentLessons() {
     });
   }
 
-  return lessons.slice(0, 10);
+  return lessons.slice(0, MAX_RECENT_LESSONS);
 }
 
 // Auto-extract on page load and cache in chrome.storage
 // Only extracts data if sidebar is already open, doesn't force it open
 window.addEventListener('load', () => {
   setTimeout(() => {
-    const data = extractCodecademyProgress();
-    chrome.storage.local.set({ cachedProgress: data });
+    try {
+      logger.debug('Auto-extracting progress on page load');
+      const data = extractCodecademyProgress();
+      chrome.storage.local.set({ cachedProgress: data }, () => {
+        if (chrome.runtime.lastError) {
+          logger.error('Failed to cache progress data', chrome.runtime.lastError);
+        } else {
+          logger.debug('Progress data cached successfully');
+        }
+      });
+    } catch (error) {
+      logger.error('Auto-extract failed', error);
+    }
   }, AUTO_EXTRACT_DELAY);
 });

@@ -3,6 +3,11 @@
 // Timing constants
 const SUCCESS_MESSAGE_DURATION = 2000; // How long to show the success message
 
+// AI instruction template
+const AI_QUIZ_INSTRUCTION = 'Please quiz me with 10 multiple choice questions focused on my most recently completed lesson. ' +
+  'After that, quiz me with 10 multiple choice questions about any of the lessons I\'ve completed so far. ' +
+  'After each answer, provide a brief explanation. After the first 20 questions stipulated above, continue quizzing me with multiple choice questions on any of my completed lessons until I say otherwise. Ready when I say "start".';
+
 // DOM elements
 const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
@@ -33,11 +38,13 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function loadProgressData() {
   try {
+    logger.debug('Loading progress data');
     // Get current active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     // Check if we're on Codecademy
     if (!tab.url.includes('codecademy.com')) {
+      logger.info('Not on Codecademy page, showing error');
       showError();
       return;
     }
@@ -48,22 +55,25 @@ async function loadProgressData() {
       { action: 'extractProgress' },
       (response) => {
         if (chrome.runtime.lastError) {
+          logger.warn('Content script not responding, loading cached data', chrome.runtime.lastError.message);
           // Content script might not be loaded yet, try cached data
           loadCachedData();
           return;
         }
 
         if (response && response.success) {
+          logger.debug('Successfully received fresh data from content script');
           progressData = response.data;
           displayProgress(progressData);
         } else {
+          logger.warn('Content script returned no data, loading cached data');
           // Fallback to cached data
           loadCachedData();
         }
       }
     );
   } catch (error) {
-    console.error('Error loading progress:', error);
+    logger.error('Error loading progress', error);
     loadCachedData();
   }
 }
@@ -72,12 +82,54 @@ async function loadProgressData() {
  * Load cached data from chrome.storage
  */
 async function loadCachedData() {
-  const result = await chrome.storage.local.get(['cachedProgress']);
-  if (result.cachedProgress) {
-    progressData = result.cachedProgress;
-    displayProgress(progressData);
-  } else {
+  try {
+    logger.debug('Loading cached progress data');
+    const result = await chrome.storage.local.get(['cachedProgress']);
+    if (result.cachedProgress) {
+      logger.debug('Cached data found');
+      progressData = result.cachedProgress;
+      displayProgress(progressData);
+    } else {
+      logger.warn('No cached data available');
+      showError();
+    }
+  } catch (error) {
+    logger.error('Failed to load cached data', error);
     showError();
+  }
+}
+
+/**
+ * Helper function to show/hide sections conditionally
+ * @param {HTMLElement} element - The element to show/hide
+ * @param {boolean} shouldShow - Whether to show the element
+ * @param {function} [contentSetter] - Optional function to set content when showing
+ */
+function toggleSection(element, shouldShow, contentSetter = null) {
+  if (shouldShow) {
+    if (contentSetter) {
+      contentSetter();
+    }
+    element.style.display = 'block';
+  } else {
+    element.style.display = 'none';
+  }
+}
+
+/**
+ * Helper function to show/hide inline elements conditionally
+ * @param {HTMLElement} element - The element to show/hide
+ * @param {boolean} shouldShow - Whether to show the element
+ * @param {function} [contentSetter] - Optional function to set content when showing
+ */
+function toggleInlineElement(element, shouldShow, contentSetter = null) {
+  if (shouldShow) {
+    if (contentSetter) {
+      contentSetter();
+    }
+    element.style.display = 'inline-block';
+  } else {
+    element.style.display = 'none';
   }
 }
 
@@ -93,53 +145,54 @@ function displayProgress(data) {
   careerPathEl.textContent = data.careerPath || 'Codecademy Career Path';
 
   // Overall progress
-  if (data.overallProgress !== null) {
-    overallProgressEl.textContent = `${data.overallProgress}%`;
-    overallProgressEl.style.display = 'block';
-  } else {
-    overallProgressEl.style.display = 'none';
-  }
+  toggleSection(
+    overallProgressEl,
+    data.overallProgress !== null,
+    () => overallProgressEl.textContent = `${data.overallProgress}%`
+  );
 
   // Current module
-  if (data.currentModule && data.currentModule.name) {
-    currentModuleNameEl.textContent = data.currentModule.name;
-    if (data.currentModule.progress !== null) {
-      currentModuleProgressEl.textContent = `${data.currentModule.progress}%`;
-      currentModuleProgressEl.style.display = 'inline-block';
-    } else {
-      currentModuleProgressEl.style.display = 'none';
+  toggleSection(
+    currentModuleSection,
+    data.currentModule && data.currentModule.name,
+    () => {
+      currentModuleNameEl.textContent = data.currentModule.name;
+      toggleInlineElement(
+        currentModuleProgressEl,
+        data.currentModule.progress !== null,
+        () => currentModuleProgressEl.textContent = `${data.currentModule.progress}%`
+      );
     }
-    currentModuleSection.style.display = 'block';
-  } else {
-    currentModuleSection.style.display = 'none';
-  }
+  );
 
   // Recent lessons
-  if (data.recentLessons && data.recentLessons.length > 0) {
-    recentLessonsEl.innerHTML = '';
-    data.recentLessons.forEach(lesson => {
-      const li = document.createElement('li');
-      li.textContent = lesson;
-      recentLessonsEl.appendChild(li);
-    });
-    recentLessonsSection.style.display = 'block';
-  } else {
-    recentLessonsSection.style.display = 'none';
-  }
+  toggleSection(
+    recentLessonsSection,
+    data.recentLessons && data.recentLessons.length > 0,
+    () => {
+      recentLessonsEl.innerHTML = '';
+      data.recentLessons.forEach(lesson => {
+        const li = document.createElement('li');
+        li.textContent = lesson;
+        recentLessonsEl.appendChild(li);
+      });
+    }
+  );
 
   // Completed modules
-  if (data.completedModules && data.completedModules.length > 0) {
-    completedModulesEl.innerHTML = '';
-    data.completedModules.forEach(module => {
-      const chip = document.createElement('span');
-      chip.className = 'module-chip';
-      chip.textContent = module;
-      completedModulesEl.appendChild(chip);
-    });
-    completedModulesSection.style.display = 'block';
-  } else {
-    completedModulesSection.style.display = 'none';
-  }
+  toggleSection(
+    completedModulesSection,
+    data.completedModules && data.completedModules.length > 0,
+    () => {
+      completedModulesEl.innerHTML = '';
+      data.completedModules.forEach(module => {
+        const chip = document.createElement('span');
+        chip.className = 'module-chip';
+        chip.textContent = module;
+        completedModulesEl.appendChild(chip);
+      });
+    }
+  );
 }
 
 /**
@@ -191,9 +244,7 @@ function formatForAI(data) {
   }
 
   // Add AI instruction
-  text += 'Please quiz me with 10 multiple choice questions focused on my most recently completed lesson. ';
-  text += 'After that, quiz me with 10 multiple choice questions about any of the lessons I\'ve completed so far. ';
-  text += 'After each answer, provide a brief explanation. After the first 20 questions stipulated above, continue quizzing me with multiple choice questions on any of my completed lessons until I say otherwise. Ready when I say "start".';
+  text += AI_QUIZ_INSTRUCTION;
 
   return text;
 }
@@ -203,12 +254,14 @@ function formatForAI(data) {
  */
 async function copyToClipboard() {
   if (!progressData) {
+    logger.warn('No progress data available to copy');
     return;
   }
 
   try {
     const formattedText = formatForAI(progressData);
     await navigator.clipboard.writeText(formattedText);
+    logger.info('Progress data copied to clipboard');
 
     // Show success message
     successMsg.classList.remove('hidden');
@@ -220,7 +273,7 @@ async function copyToClipboard() {
       copyBtn.classList.remove('success');
     }, SUCCESS_MESSAGE_DURATION);
   } catch (error) {
-    console.error('Failed to copy:', error);
+    logger.error('Failed to copy to clipboard', error);
     alert('Failed to copy to clipboard. Please try again.');
   }
 }
@@ -230,6 +283,7 @@ async function copyToClipboard() {
  */
 async function navigateToCareerPath() {
   try {
+    logger.debug('Attempting to navigate to career path page');
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     let targetUrl = null;
 
@@ -238,6 +292,7 @@ async function navigateToCareerPath() {
       const parsed = parseCareerPathUrl(tab.url);
       if (parsed) {
         targetUrl = parsed;
+        logger.debug('Parsed URL from current tab:', targetUrl);
       }
     }
 
@@ -247,23 +302,24 @@ async function navigateToCareerPath() {
       if (result.cachedProgress?.pageUrl &&
           result.cachedProgress.pageUrl !== 'https://www.codecademy.com/learn') {
         targetUrl = result.cachedProgress.pageUrl;
-        console.log('Using cached URL:', targetUrl);
+        logger.info('Using cached URL:', targetUrl);
       }
     }
 
     // If still no URL, default to learn page
     if (!targetUrl) {
       targetUrl = 'https://www.codecademy.com/learn';
-      console.log('No cached career path found, using default:', targetUrl);
+      logger.info('No cached career path found, using default:', targetUrl);
     }
 
     // Navigate to the target URL
     await chrome.tabs.update(tab.id, { url: targetUrl });
+    logger.info('Navigating to:', targetUrl);
 
     // Close the popup (it will reopen automatically after navigation)
     window.close();
   } catch (error) {
-    console.error('Navigation error:', error);
+    logger.error('Navigation error', error);
     alert('Failed to navigate. Please manually go to your Codecademy career path page.');
   }
 }
