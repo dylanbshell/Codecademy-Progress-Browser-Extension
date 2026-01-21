@@ -6,7 +6,9 @@ const SUCCESS_MESSAGE_DURATION = 2000; // How long to show the success message
 // AI instruction template
 const AI_QUIZ_INSTRUCTION = 'Please quiz me with 10 multiple choice questions focused on my most recently completed lesson. ' +
   'After that, quiz me with 10 multiple choice questions about any of the lessons I\'ve completed so far. ' +
-  'After each answer, provide a brief explanation. After the first 20 questions stipulated above, continue quizzing me with multiple choice questions on any of my completed lessons until I say otherwise. Ready when I say "start".';
+  'Finally, continue quizzing me with multiple choice questions on any of my completed lessons until I say otherwise. ' +
+  'Be sure to provide a brief explanation after each answer. ' +
+  'Ready when I say "start".';
 
 // DOM elements
 const loadingEl = document.getElementById('loading');
