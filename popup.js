@@ -6,7 +6,7 @@ const SUCCESS_MESSAGE_DURATION = 2000; // How long to show the success message
 // AI instruction template
 const AI_QUIZ_INSTRUCTION = 'Please quiz me with 10 multiple choice questions focused on my most recently completed lesson. ' +
   'After that, quiz me with 10 multiple choice questions about any of the lessons I\'ve completed so far. ' +
-  'Finally, continue quizzing me with multiple choice questions on any of my completed lessons until I say otherwise. ' +
+  'Finally, continue quizzing me with multiple choice questions on any of the lessons I\'ve completed until I ask otherwise. ' +
   'Be sure to provide a brief explanation after each answer. ' +
   'Ready when I say "start".';
 
@@ -238,9 +238,9 @@ function formatForAI(data) {
 
   // Add completed modules
   if (data.completedModules && data.completedModules.length > 0) {
-    text += 'Previously completed modules:\n';
-    data.completedModules.forEach(module => {
-      text += `• ${module}\n`;
+    text += 'Previously completed modules (oldest to most recent):\n';
+    data.completedModules.forEach((module, index) => {
+      text += `${index + 1}. ${module}\n`;
     });
     text += '\n';
   }
