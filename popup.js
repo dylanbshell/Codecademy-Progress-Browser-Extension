@@ -191,9 +191,9 @@ function formatForAI(data) {
   }
 
   // Add AI instruction
-  text += 'Please quiz me with 5-7 quick recall questions focused on my most recently completed lesson. ';
-  text += 'After that, quiz me with 5-7 quick recall questions about any of the lessons I\'ve completed so far. ';
-  text += 'After each answer, provide a brief explanation. Continue quizzing me like this until say otherwise. Ready when I say "start".';
+  text += 'Please quiz me with 10 multiple choice questions focused on my most recently completed lesson. ';
+  text += 'After that, quiz me with 10 multiple choice questions about any of the lessons I\'ve completed so far.';
+  text += 'After each answer, provide a brief explanation. After the first 20 questions stipulated above, continue quizzing me with multiple choice questions on any of my completed lessons until I say otherwise. Ready when I say "start".';
 
   return text;
 }
